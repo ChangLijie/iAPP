@@ -58,16 +58,22 @@ class Calculate_IOU(iAPP_SEG):
         Returns:
             list: Return a list that contain objcet user want to calculate iou. 
         """
-        if not self.params['application'].__contains__('depend_on'):
-            raise KeyError("App config not set change object! please correct it!")
+        if not self.params['application'].__contains__('areas'):
+            raise KeyError("App config not set area! please correct it!")
         
-        if not isinstance(self.params['application']['depend_on'],list):
-            raise ValueError("Depend on type must be list but you set {}! please correct it!".format(type(self.params['application']['depend_on'])))
+        if len(self.params['application']['areas'])==0:
+            raise KeyError("App config not set depend_on! please correct it!")
         
-        if len(self.params['application']['depend_on'])==0:
+        if not self.params['application']['areas'][0].__contains__('depend_on'):
+            raise KeyError("App config not set depend_on! please correct it!")
+
+        if not isinstance(self.params['application']['areas'][0]['depend_on'],list):
+            raise ValueError("Depend on type must be list but you set {}! please correct it!".format(type(self.params['application']['areas'][0]['depend_on'])))
+        
+        if len(self.params['application']['areas'][0]['depend_on'])==0:
             return self.label
         else:
-            return self.params['application']['depend_on']
+            return self.params['application']['areas'][0]['depend_on']
         
     def calculate_iou(self,masks:np.ndarray):
         """
@@ -336,16 +342,23 @@ if __name__=='__main__':
         dpr = Displayer( cv = True )
 
     # 6. Setting iApp
-    app_config =   {    
-                        
-                        "application": {
-                            "depend_on":[],
-                            "palette":{
-                                "car":[0,0,0]
-
+    app_config =   {
+                    "application": {
+                        "palette": {
+                            "car": [
+                                0,
+                                0,
+                                0
+                            ]
+                        },
+                        "areas": [
+                            {
+                                "name": "default",
+                                "depend_on": [],
                             }
-                        }
+                        ],
                     }
+                }
     
     app = Calculate_IOU(app_config,args.label)
     # 7. Start Inference
