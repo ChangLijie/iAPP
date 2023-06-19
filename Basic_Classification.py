@@ -1,31 +1,47 @@
 import cv2
 import logging
+import numpy as np
 from apps.palette import palette
+from typing import Union, get_args
 from ivit_i.common.app import iAPP_CLS
-class Basic_Classification(iAPP_CLS):
-    """ __init__, __call__ """
 
-    def __init__(self, params=None, label=None, palette=palette, log=True):
+class Basic_Classification(iAPP_CLS):
+
+    def __init__(self, params:dict, label:str, palette:dict=palette):
+        """
+        Basic_Classification .
+        Args:
+            params (dict, optional): _description_. Defaults to None.
+            label (str, optional): _description_. Defaults to None.
+            palette (dict, optional): _description_. Defaults to palette.
+        """
         self.params = params
         self.app_type = 'cls'
-        self.depend_on = []
-        self.palette= {}
-        self.model_label = label
-        self.model_label_list =[]
-        self.init_palette(palette)
         self.depend_on = self.params['application']['areas'][0]['depend_on']
+        self.palette= {}
+        self.label_path = label
+        self.label_list =[]
+        self._init_palette(palette)
         self.FONT            = cv2.FONT_HERSHEY_SIMPLEX
         self.FONT_SCALE      = 1
         self.FONT_THICK      = cv2.LINE_AA
         self.FONT_THICKNESS  = 1
-        
-
-    def init_palette(self,palette):
-
+        self.WIDTH_SPACE = 10
+        self.HIGHT_SPACE = 10
+        self.OPACITY = 0.4
+    
+    def _init_palette(self,palette:dict):
+        """
+        We will deal all color we need there.
+        Step 1 : assign color for each label.
+        Step 2 : if app_config have palette that user stting we will change the color follow user setting.
+        Args:
+            palette (dict): _description_
+        """
         color = None
-        with open(self.model_label,'r') as f:
-            # lines = f.read().splitlines()
+        with open(self.label_path,'r') as f:
             for idx, line in enumerate(f.readlines()):
+                #idx in palette begin to 1.
                 idx+=1
                 if self.params['application'].__contains__('palette'):
                     
@@ -37,63 +53,142 @@ class Basic_Classification(iAPP_CLS):
                     color = palette[str(idx)]
                 
                 self.palette.update({line.strip():color})
-                self.model_label_list.append(line.strip())
-                
-                
-
+                self.label_list.append(line.strip())  
         
-        
-    def set_color(self,label:str,color:tuple):
+    def get_color(self, label:str):
         """
-        set color :
+            Get color of label.
+        Args:
+            label (str): label of object.
 
-        sample of paremeter : 
-            label = "dog"
-            color = (0,0,255)
+        Returns:
+            list: (B,G,R).
         """
-        self.palette.update({label:color})
-        logging.info("Label: {} , change color to {}.".format(label,color))
-        
-    def get_color(self, label):
         return self.palette[label]        
+    
+    def _update_draw_param(self,frame:np.ndarray):
+        """
+            Accourding to the resolution of frame to modify draw size.
+        Args:
+            frame (np.ndarray): input image.
+
+        """
         
-    def check_depend(self, label):
+        self.FONT_SCALE = 1 *int(((frame.shape[1]/640)+(frame.shape[0]/425))/2)
+        self.FONT_THICKNESS = 2 *int((frame.shape[1]/640))
+        self.WIDTH_SPACE = 10 * (frame.shape[1]//640)
+        self.HIGHT_SPACE = 10 * (frame.shape[0]//425)
+
+    def _check_depend(self, label:str):
+        """
+            Check label whether in the depend on or not.
+        Args:
+            label (str): label of model predict.
+
+        Returns:
+            bool : label whether in the depend on or not.
+        """
         ret = True
        
         if len(self.depend_on)>0:
             ret = (label in self.depend_on)
         return ret
+    
+    def draw_app_result(self,frame,result:dict,id,color:tuple= (255,255,255)):
+        outer_clor=color
+        font_color = (255-color[0],255-color[1],255-color[2])
+        overlay = frame.copy()
 
-    def __call__(self, frame, detections, draw=True) -> tuple:
+        (t_wid, t_hei), t_base = cv2.getTextSize(result, cv2.FONT_HERSHEY_SIMPLEX, self.FONT_SCALE, self.FONT_THICKNESS)
+        
+        t_xmin, t_ymin, t_xmax, t_ymax = int(self.WIDTH_SPACE), int(self.HIGHT_SPACE+self.HIGHT_SPACE*id+(id*(t_hei+t_base))), \
+        int(self.WIDTH_SPACE+t_wid), int(self.HIGHT_SPACE+self.HIGHT_SPACE*id+((id+1)*(t_hei+t_base)))
+        
+        # cv2.rectangle(frame, (t_xmin, t_ymin), (t_xmax, t_ymax+t_base), outer_clor , -1)
+        point = np.array([[t_xmin, t_ymin],[t_xmax,t_ymin],[t_xmax, t_ymax+t_base],[t_xmin,t_ymax+t_base]])
+
+        
+        
+        cv2.fillPoly(overlay, pts=[point], color=outer_clor)
+        frame = cv2.addWeighted( frame, 1-self.OPACITY, overlay, self.OPACITY, 0 )
+
+        
+        
+        return cv2.putText(frame, result, (t_xmin, t_ymax), cv2.FONT_HERSHEY_SIMPLEX,
+            self.FONT_SCALE, font_color, self.FONT_THICKNESS, cv2.LINE_AA)
+        
+    def set_draw(self,params:dict):
+        """
+        Control anything about drawing.
+        Which params you can contral :
+
+        {  
+            palette (dict) { label(str) : color(Union[tuple, list]) },
+        }
+        
+        Args:
+            params (dict): 
+        """
+        color_support_type = Union[tuple, list]
+        palette = params.get('palette', None)
+        if isinstance(palette, dict):
+            if len(palette)==0:
+                logging.warning("Not set palette!")
+                pass
+            else:
+                for label,color in palette.items():
+
+                    if isinstance(label, str) and isinstance(color, get_args(color_support_type)):
+                        if self.palette.__contains__(label):
+                           self.palette.update({label:color})
+                        else:
+                            logging.error("Model can't recognition the label {} , please checkout your label!.".format(label))
+                        logging.info("Label: {} , change color to {}.".format(label,color))
+                    else:
+                        logging.error("Value in palette type must (label:str , color :Union[tuple , list] ),your type \
+                                      label:{} , color:{} is error.".format(type(label),type(color)))
+        else:
+            logging.error("Not set palette or your type {} is error.".format(type(palette)))
+
+    def __call__(self, frame:np.ndarray, detections:list):
+        """
+
+        Args:
+            frame (np.ndarray): The img that we want to deal with.
+            detections (list): output of model predict
+
+        Returns:
+            tuple:We will return the frame that finished painting and sort out infomation.
+        """
+        self._update_draw_param(frame)
         
         app_output = { "areas":[{"id":0,"name":"default","data":[]}] }
-
+        
         for idx, label, score in detections:
            
             # Checking Depend
-            if not self.check_depend(label): continue
-
+            if not self._check_depend(label): continue
+            
             # Draw something                
             content     = '{} {:.1%}'.format(label, score)
-            ( text_width, text_height), text_base \
-                = cv2.getTextSize(content, self.FONT, self.FONT_SCALE, self.FONT_THICKNESS)
-            xmin        = 10
-            ymin        = 10 + len(app_output['areas'][0]['data'])*(text_height+text_base)
-            xmax        = xmin + text_width
-            ymax        = ymin + text_height  
-            app_output['areas'][0]['data'].append({"label":label,"score":score})
-
             cur_color = self.get_color(label)
+            frame = self.draw_app_result(frame,content,idx,cur_color)
+            # ( text_width, text_height), text_base \
+            #     = cv2.getTextSize(content, self.FONT, self.FONT_SCALE, self.FONT_THICKNESS)
+            # xmin        = self.WIDTH_SPACE
+            # ymin        = self.HIGHT_SPACE + len(app_output['areas'][0]['data'])*(text_height+text_base)
+            # xmax        = xmin + text_width
+            # ymax        = ymin + text_height  
+            # app_output['areas'][0]['data'].append({"label":label,"score":score})
+
+            # cur_color = self.get_color(label)
             
-
-            cv2.putText(
-                frame, content, (xmin, ymax), self.FONT,
-                self.FONT_SCALE, cur_color, self.FONT_THICKNESS, self.FONT_THICK
-            )      
-
+            # cv2.putText(
+            #     frame, content, (xmin, ymax), self.FONT,
+            #     self.FONT_SCALE, cur_color, self.FONT_THICKNESS, self.FONT_THICK
+            # )    
+            
         return ( frame, app_output, {} )
-
-
 
 if __name__=='__main__':
     import logging as log
@@ -174,7 +269,7 @@ if __name__=='__main__':
                             "areas": [
                                 {
                                     "name": "default",
-                                    "depend_on": [ ]
+                                    "depend_on": []
                                 }
                             ]
                         }
@@ -188,10 +283,11 @@ if __name__=='__main__':
             # Get frame & Do infernece
             frame = src.read()       
             detections = model.inference( frame )
+
             frame , app_output , event_output =app(frame,detections)
-                
+    
             # Draw FPS: default is left-top                     
-            infer_metrx.paint_metrics(frame)
+            # infer_metrx.paint_metrics(frame)
             
             # Display
             dpr.show(frame=frame)                   
