@@ -129,13 +129,12 @@ class Calculate_IOU(iAPP_SEG):
                 temp_palette.update({label:palette[str(idx+1)]})
         return temp_palette
     
-    def draw(self,result:dict,iou_result:dict,draw_mask:bool=True,draw_iou_result:bool=True):
+    def draw(self,frame:np.ndarray,result:dict,iou_result:dict,draw_mask:bool=True,draw_iou_result:bool=True):
         
         #step1 : Get ori frame and mask.
-        frame = result['frame']
-        masks_B = result['detections'].copy()
-        masks_G = result['detections'].copy()
-        masks_R = result['detections'].copy()
+        masks_B = result.copy()
+        masks_G = result.copy()
+        masks_R = result.copy()
 
         #step2 : according to the pallete change the mask color.
         for idx,label in enumerate(self.label):
@@ -196,7 +195,7 @@ class Calculate_IOU(iAPP_SEG):
 
         return frame
     
-    def set_draw(self,params:dict):
+    def set_draw(self,frame:np.ndarray,params:dict):
         """
         Control anything about drawing.
         Which params you can contral :
@@ -243,7 +242,7 @@ class Calculate_IOU(iAPP_SEG):
         else:
             logging.error("Not set palette or your type {} is error.".format(type(palette)))
 
-    def __call__(self,result:dict):
+    def __call__(self,frame:np.ndarray,result:dict):
         """
 
         Args:
@@ -254,7 +253,7 @@ class Calculate_IOU(iAPP_SEG):
         """
 
         #step1 : get all mask from segmentation model 
-        masks = result["detections"]
+        masks = result
         
         #step2 : accrounding to the label to calculate iou.
         
@@ -262,7 +261,7 @@ class Calculate_IOU(iAPP_SEG):
 
         #step3 : draw the result on the image
 
-        frame = self.draw(result,iou_result)
+        frame = self.draw(frame,result,iou_result)
 
         return frame , iou_result 
 
@@ -367,12 +366,12 @@ if __name__=='__main__':
             # Get frame & Do infernece
             frame = src.read()       
             result = model.inference( frame )
-
+            frame,info = app(frame,result)  
             if args.no_show:
                 pass
             else:
                 # Draw results 
-                frame,info = app(result)    
+            
                 # a={ 
                 #     'draw_mask' : True , 
                 #     'draw_iou_result' : True 

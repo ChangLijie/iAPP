@@ -123,7 +123,7 @@ class Change_background(iAPP_SEG):
             raise FileExistsError('image path is incorrect: {}'.format(img_path))
         self.background_frame_path = img_path
 
-    def __call__(self,result:dict):
+    def __call__(self,frame:np.ndarray,result:dict):
         """
 
         Args:
@@ -133,14 +133,14 @@ class Change_background(iAPP_SEG):
             result_frame (np.ndarray): treated frame.
         """
         #step1 : read img
-        ori_frame = result['frame']
+        ori_frame = frame
         bcakground_frame = cv2.imread(self.background_frame_path)
 
         #step2 : accrouding to the ori img shape to resize the background img.
         bcakground_frame = cv2.resize(bcakground_frame, (ori_frame.shape[1], ori_frame.shape[0]), interpolation=cv2.INTER_AREA)
 
         #step3 : get all mask from segmentation model 
-        masks = result["detections"]
+        masks = result
         
         #step4 : accrounding to the label to create masks
         
@@ -248,12 +248,13 @@ if __name__=='__main__':
             # Get frame & Do infernece
             frame = src.read()       
             result = model.inference( frame )
+            frame = app(frame,result)    
 
             if args.no_show:
                 pass
             else:
                 # Draw results 
-                frame = app(result)              
+                          
                 infer_metrx.paint_metrics(frame)
                 
                 # Display
