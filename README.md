@@ -9,6 +9,8 @@ AI Application Zoo For iVIT-I
 * [Detection Zone](#detection-zone)
 * [Tracking Zone](#tracking-zone)
 * [Movement Zone](#movement-zone)
+* [Calculate IOU](#calculate-iou)
+* [Change background](#change-background)
 
 # Prepare Environment
 Please based on your device to clone repository of IVIT-I. 
@@ -70,3 +72,13 @@ Add Functions.
 * User can track mutiple object.
 * User can get direction.
 
+# Calculate IOU  
+![](./docs/figure//Calculate_IOU.png)   
+More information about how to use this application [here](./docs/Calculate_IOU.md).
+* User can display objects they want to see. 
+* User can set color for specific object.
+
+# Change background
+![](./docs/figure//Change_background.png)   
+More information about how to use this application [here](./docs/Change_background.md).
+* User can change backgroud accourding object.
